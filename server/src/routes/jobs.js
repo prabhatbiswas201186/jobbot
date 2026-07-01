@@ -1,8 +1,90 @@
 import { Router } from 'express';
-import { data, save } from '../store.js';
+import { data, save, randomUUID } from '../store.js';
 import { geminiJSON } from '../gemini.js';
 
 export const jobsRouter = Router();
+
+// ---------------------------------------------------------------------------
+// Live job search via JSearch (RapidAPI). Aggregates Indeed / LinkedIn /
+// Glassdoor / ZipRecruiter. Requires RAPIDAPI_KEY in server/.env.
+// ---------------------------------------------------------------------------
+function mapRegion(countryCode) {
+  const c = (countryCode || '').toUpperCase();
+  if (c === 'IN') return 'india';
+  if (c === 'AE') return 'uae';
+  if (c === 'SA') return 'saudi';
+  return 'remote-intl';
+}
+
+function initials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((p) => p[0]).join('').toUpperCase();
+}
+
+jobsRouter.post('/search', async (req, res) => {
+  const apiKey = process.env.RAPIDAPI_KEY;
+  if (!apiKey) {
+    return res.status(400).json({
+      error:
+        'Live search needs a RapidAPI key. Add RAPIDAPI_KEY=your-key to server/.env (see RUN.md), then restart JobBot.',
+    });
+  }
+
+  const query = (req.body?.query || '').trim();
+  const location = (req.body?.location || '').trim();
+  if (!query) return res.status(400).json({ error: 'Enter a role to search for.' });
+
+  const fullQuery = location ? `${query} in ${location}` : query;
+
+  try {
+    const url = `https://jsearch.p.rapidapi.com/search?query=${encodeURIComponent(fullQuery)}&page=1&num_pages=1`;
+    const jsRes = await fetch(url, {
+      headers: {
+        'X-RapidAPI-Key': apiKey,
+        'X-RapidAPI-Host': 'jsearch.p.rapidapi.com',
+      },
+    });
+    if (!jsRes.ok) {
+      const body = await jsRes.text();
+      throw new Error(`JSearch request failed (${jsRes.status}): ${body.slice(0, 300)}`);
+    }
+    const payload = await jsRes.json();
+    const results = Array.isArray(payload.data) ? payload.data : [];
+
+    // Replace any previous live-search results (and their match scores) so the
+    // list stays focused on the latest search.
+    const staleIds = new Set(data.jobs.filter((j) => j.source === 'jsearch').map((j) => j.id));
+    data.jobs = data.jobs.filter((j) => j.source !== 'jsearch');
+    data.job_matches = data.job_matches.filter((m) => !staleIds.has(m.job_id));
+
+    const mapped = results.map((r) => ({
+      id: randomUUID(),
+      source: 'jsearch',
+      external_id: r.job_id ?? null,
+      role: r.job_title ?? 'Untitled role',
+      company: r.employer_name ?? 'Unknown company',
+      logo_text: initials(r.employer_name),
+      location: [r.job_city, r.job_country].filter(Boolean).join(', ') || (r.job_is_remote ? 'Remote' : 'N/A'),
+      region: r.job_is_remote ? 'remote-intl' : mapRegion(r.job_country),
+      tags: [r.job_employment_type, r.job_is_remote ? 'Remote' : null].filter(Boolean),
+      salary_min: r.job_min_salary ?? null,
+      salary_max: r.job_max_salary ?? null,
+      currency: r.job_salary_currency ?? 'USD',
+      url: r.job_apply_link ?? r.job_google_link ?? null,
+      description: r.job_description ?? null,
+      posted_at: r.job_posted_at_datetime_utc ?? new Date().toISOString(),
+    }));
+
+    data.jobs.push(...mapped);
+    save();
+
+    res.json({ count: mapped.length, query: fullQuery });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 jobsRouter.get('/', (req, res) => {
   const { region } = req.query;

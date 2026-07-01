@@ -45,11 +45,30 @@ To stop it, press `Ctrl+C` in the terminal.
   Match scoring, and the floating co-pilot are all live Gemini calls grounded in
   your actual data — not scripted demo content.
 - The Job Match module ships seeded with 20 real job listings (5 each across
-  India, UAE, Saudi Arabia, and international remote), pulled live from Indeed
-  at the time this was built. Nothing refreshes automatically — this is a
-  point-in-time snapshot, not a live feed.
+  India, UAE, Saudi Arabia, and international remote), pulled from Indeed at the
+  time this was built — a point-in-time snapshot.
+- **Live job search (optional):** add a free RapidAPI key to `server/.env` and
+  the search bar on the Job Match page will fetch *current* listings for any
+  role/location via the JSearch API (which aggregates Indeed, LinkedIn,
+  Glassdoor & ZipRecruiter). Without the key, the seeded snapshot still works.
+- Each job card has an **"Apply on Indeed →"** link that opens the real posting
+  where you actually apply; **"Track"** just saves it to your local board.
 - The Tracker board, applications, and interview schedule are all stored
   locally and persist across restarts (same JSON file).
+
+## Enabling live job search
+
+1. Sign up at **https://rapidapi.com** (free).
+2. Go to the **JSearch** API page (search "JSearch" in the RapidAPI hub) and
+   click **Subscribe** → pick the **Basic (free)** plan.
+3. On the JSearch "Endpoints" page, copy your key from the
+   `X-RapidAPI-Key` header field.
+4. Add it to `server/.env`:
+   ```
+   RAPIDAPI_KEY=your-key-here
+   ```
+5. Restart JobBot. The "Search live jobs" bar on Job Match now returns current
+   listings; hit "Refresh AI match scores" to rank them against your résumé.
 
 ## Resetting your data
 

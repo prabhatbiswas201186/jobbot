@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { computeJobMatches, createApplication, listJobsWithMatches } from '../../data/api';
+import { computeJobMatches, createApplication, listJobsWithMatches, searchLiveJobs } from '../../data/api';
 import type { JobRegion, JobWithMatch } from '../../types';
 
 const regions: { value: JobRegion | 'all'; label: string }[] = [
@@ -19,6 +19,12 @@ export function JobMatch() {
   const [matching, setMatching] = useState(false);
   const [applyingId, setApplyingId] = useState<string | null>(null);
 
+  const [searchRole, setSearchRole] = useState('');
+  const [searchLocation, setSearchLocation] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchMsg, setSearchMsg] = useState<string | null>(null);
+  const [searchErr, setSearchErr] = useState<string | null>(null);
+
   const load = async () => {
     setLoading(true);
     const j = await listJobsWithMatches(region === 'all' ? undefined : region);
@@ -30,6 +36,23 @@ export function JobMatch() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [region]);
+
+  const handleSearch = async () => {
+    if (!searchRole.trim()) return;
+    setSearching(true);
+    setSearchErr(null);
+    setSearchMsg(null);
+    try {
+      const res = await searchLiveJobs({ query: searchRole, location: searchLocation });
+      setSearchMsg(`Found ${res.count} live job${res.count === 1 ? '' : 's'} for "${res.query}". Hit "Refresh AI match scores" to rank them.`);
+      setRegion('all');
+      await load();
+    } catch (err) {
+      setSearchErr((err as Error).message);
+    } finally {
+      setSearching(false);
+    }
+  };
 
   const handleComputeMatches = async () => {
     setMatching(true);
@@ -74,6 +97,29 @@ export function JobMatch() {
           {matching ? 'Scoring with Gemini…' : '✦ Refresh AI match scores'}
         </button>
       </div>
+
+      {/* live search */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input
+          value={searchRole}
+          onChange={(e) => setSearchRole(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          placeholder="Search a role — e.g. Product Manager"
+          style={{ flex: '2 1 240px', background: 'var(--surface)', border: '1px solid var(--border2)', color: 'var(--text)', padding: '11px 14px', borderRadius: 11, fontSize: 14, outline: 'none' }}
+        />
+        <input
+          value={searchLocation}
+          onChange={(e) => setSearchLocation(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          placeholder="Location (optional) — e.g. Bangalore, Dubai, Remote"
+          style={{ flex: '1 1 180px', background: 'var(--surface)', border: '1px solid var(--border2)', color: 'var(--text)', padding: '11px 14px', borderRadius: 11, fontSize: 14, outline: 'none' }}
+        />
+        <button onClick={handleSearch} disabled={searching} style={{ ...primaryBtnStyle, opacity: searching ? 0.7 : 1 }}>
+          {searching ? 'Searching…' : 'Search live jobs'}
+        </button>
+      </div>
+      {searchMsg && <div style={{ color: 'var(--mint)', fontSize: 13, marginBottom: 14 }}>{searchMsg}</div>}
+      {searchErr && <div style={{ color: 'var(--rose)', fontSize: 13, marginBottom: 14 }}>{searchErr}</div>}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         {regions.map((r) => (

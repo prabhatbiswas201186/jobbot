@@ -86,6 +86,13 @@ export function computeJobMatches(region?: JobRegion) {
   });
 }
 
+export function searchLiveJobs(input: { query: string; location?: string }) {
+  return request<{ count: number; query: string }>('/jobs/search', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Applications / pipeline
 // ---------------------------------------------------------------------------
