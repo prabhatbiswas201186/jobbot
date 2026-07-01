@@ -132,13 +132,25 @@ export function JobMatch() {
                   <span style={{ fontFamily: "'Space Grotesk'", fontWeight: 700, fontSize: 14 }}>{j.match_score != null ? `${j.match_score}%` : '—'}</span>
                 </div>
               </div>
-              <button
-                onClick={() => handleApply(j)}
-                disabled={applyingId === j.id}
-                style={{ background: 'var(--text)', color: 'var(--bg)', border: 'none', padding: '10px 15px', borderRadius: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Manrope', flex: 'none' }}
-              >
-                {applyingId === j.id ? 'Adding…' : 'Track application'}
-              </button>
+              <div style={{ display: 'flex', gap: 8, flex: 'none' }}>
+                {j.url && (
+                  <a
+                    href={j.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ background: 'var(--text)', color: 'var(--bg)', border: 'none', padding: '10px 15px', borderRadius: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Manrope', textDecoration: 'none', whiteSpace: 'nowrap' }}
+                  >
+                    Apply on Indeed →
+                  </a>
+                )}
+                <button
+                  onClick={() => handleApply(j)}
+                  disabled={applyingId === j.id}
+                  style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border2)', padding: '10px 15px', borderRadius: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'Manrope', whiteSpace: 'nowrap' }}
+                >
+                  {applyingId === j.id ? 'Adding…' : 'Track'}
+                </button>
+              </div>
             </div>
           ))}
           {jobs.length === 0 && <div style={{ color: 'var(--dim)', textAlign: 'center', padding: 40 }}>No listings in this region yet.</div>}
