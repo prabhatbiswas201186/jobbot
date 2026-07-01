@@ -1,0 +1,150 @@
+:root {
+  --bg: #08080b;
+  --bg2: #0c0c11;
+  --surface: #111117;
+  --surface2: #16161d;
+  --raised: #1c1c25;
+  --text: #f5f5f8;
+  --dim: #9a9aab;
+  --faint: #63636f;
+  --border: rgba(255, 255, 255, 0.08);
+  --border2: rgba(255, 255, 255, 0.13);
+  --accent: #6d5efc;
+  --accent2: #a56bff;
+  --mint: #34e0a1;
+  --amber: #ffb547;
+  --rose: #ff6b81;
+  --sky: #57c7ff;
+  --glow: rgba(109, 94, 252, 0.45);
+  --shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+body.light {
+  --bg: #f6f6f9;
+  --bg2: #eeeef3;
+  --surface: #ffffff;
+  --surface2: #f4f4f8;
+  --raised: #ffffff;
+  --text: #16161c;
+  --dim: #5c5c6b;
+  --faint: #9a9aab;
+  --border: rgba(10, 10, 20, 0.09);
+  --border2: rgba(10, 10, 20, 0.14);
+  --glow: rgba(109, 94, 252, 0.28);
+  --shadow: 0 12px 40px -14px rgba(30, 20, 80, 0.18);
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Manrope', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.5s ease, color 0.3s ease;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border-radius: 9px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+@keyframes pulseGlow {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+@keyframes scanline {
+  0% {
+    top: 0;
+  }
+  100% {
+    top: 100%;
+  }
+}
+
+.fu {
+  animation: fadeUp 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
