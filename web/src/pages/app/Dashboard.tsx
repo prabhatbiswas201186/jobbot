@@ -1,36 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import { ScoreRing } from '../../components/ScoreRing';
 import {
   getMasterResume,
+  getProfile,
   listApplications,
   listJobsWithMatches,
   listUpcomingInterviews,
 } from '../../data/api';
-import type { Application, Interview, JobWithMatch, Resume } from '../../types';
+import type { Application, Interview, JobWithMatch, Profile, Resume } from '../../types';
 
 export function Dashboard() {
-  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [resume, setResume] = useState<Resume | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [jobs, setJobs] = useState<JobWithMatch[]>([]);
 
   useEffect(() => {
-    if (!user) return;
     setLoading(true);
-    Promise.all([getMasterResume(user.id), listApplications(user.id), listUpcomingInterviews(user.id), listJobsWithMatches(user.id)])
-      .then(([r, a, i, j]) => {
+    Promise.all([getProfile(), getMasterResume(), listApplications(), listUpcomingInterviews(), listJobsWithMatches()])
+      .then(([p, r, a, i, j]) => {
+        setProfile(p);
         setResume(r);
         setApplications(a);
         setInterviews(i);
         setJobs(j);
       })
       .finally(() => setLoading(false));
-  }, [user]);
+  }, []);
 
   const stageCounts = useMemo(() => {
     const counts: Record<string, Application[]> = { applied: [], screening: [], interview: [], offer: [] };

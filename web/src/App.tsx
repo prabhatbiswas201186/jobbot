@@ -7,21 +7,13 @@ import { ResumeStudio } from './pages/app/ResumeStudio';
 import { JobMatch } from './pages/app/JobMatch';
 import { InterviewCoach } from './pages/app/InterviewCoach';
 import { Tracker } from './pages/app/Tracker';
-import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/onboarding" element={<Onboarding />} />
-      <Route
-        path="/app"
-        element={
-          <ProtectedRoute>
-            <AppShell />
-          </ProtectedRoute>
-        }
-      >
+      <Route path="/app" element={<AppShell />}>
         <Route index element={<Dashboard />} />
         <Route path="resume" element={<ResumeStudio />} />
         <Route path="jobs" element={<JobMatch />} />

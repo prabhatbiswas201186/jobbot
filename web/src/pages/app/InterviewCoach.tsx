@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import { ScoreRing } from '../../components/ScoreRing';
 import { getQuestionBank, latestMockSession, listUpcomingInterviews, scoreMockAnswer, type ScoreAnswerResult } from '../../data/api';
 import type { Interview, MockSession } from '../../types';
@@ -13,7 +12,6 @@ const tagColors: Record<string, string> = {
 };
 
 export function InterviewCoach() {
-  const { user } = useAuth();
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [questions, setQuestions] = useState<{ tag: string; question: string }[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(true);
@@ -26,9 +24,8 @@ export function InterviewCoach() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) return;
-    latestMockSession(user.id).then(setLastSession);
-    listUpcomingInterviews(user.id).then((list) => {
+    latestMockSession().then(setLastSession);
+    listUpcomingInterviews().then((list) => {
       setInterviews(list);
       const nextInterview = list[0];
       getQuestionBank({ targetRole: nextInterview?.role, targetCompany: nextInterview?.company })
@@ -36,7 +33,7 @@ export function InterviewCoach() {
         .catch(() => setQuestions([]))
         .finally(() => setLoadingQuestions(false));
     });
-  }, [user]);
+  }, []);
 
   const handleScore = async () => {
     if (!answer.trim() || answer.trim().length < 10) {
@@ -48,7 +45,7 @@ export function InterviewCoach() {
     try {
       const result = await scoreMockAnswer({ question: activeQuestion, answerText: answer });
       setScoreResult(result);
-      if (user) latestMockSession(user.id).then(setLastSession);
+      latestMockSession().then(setLastSession);
     } catch (err) {
       setError((err as Error).message);
     } finally {

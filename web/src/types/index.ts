@@ -1,13 +1,10 @@
 export interface Profile {
-  id: string;
+  id: number;
   full_name: string;
-  headline: string;
-  location: string;
   target_comp_min: number | null;
   target_comp_max: number | null;
   target_currency: string;
   onboarding_stage: 'upload' | 'analyzing' | 'results' | 'done';
-  autopilot_enabled: boolean;
 }
 
 export interface ResumeVersion {

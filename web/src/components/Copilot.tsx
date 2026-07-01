@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import { getCopilotGreeting, listCopilotHistory, sendCopilotMessage } from '../data/api';
 import type { CopilotMessage } from '../types';
 
 export function Copilot() {
-  const { user } = useAuth();
   const [open, setOpen] = useState(true);
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [insight, setInsight] = useState<{ title: string; body: string; cta?: string } | null>(null);
@@ -14,9 +12,9 @@ export function Copilot() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!user || loaded) return;
+    if (loaded) return;
     setLoaded(true);
-    listCopilotHistory(user.id).then(async (history) => {
+    listCopilotHistory().then(async (history) => {
       if (history.length > 0) {
         setMessages(history as CopilotMessage[]);
         return;
@@ -40,7 +38,7 @@ export function Copilot() {
         ]);
       }
     });
-  }, [user, loaded]);
+  }, [loaded]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });

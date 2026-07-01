@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
-import { useAuth } from '../../context/AuthContext';
+import { getProfile } from '../../data/api';
 import { Copilot } from '../../components/Copilot';
+import type { Profile } from '../../types';
 
 const navItems = [
   { to: '/app', icon: '📊', label: 'Mission Control', end: true },
@@ -21,10 +23,14 @@ const titleByPath: Record<string, string> = {
 
 export function AppShell() {
   const { dark, toggleTheme } = useTheme();
-  const { profile, user, signOut } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const title = titleByPath[location.pathname] ?? 'JobBot';
+
+  useEffect(() => {
+    getProfile().then(setProfile).catch(() => setProfile(null));
+  }, []);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
@@ -90,15 +96,13 @@ export function AppShell() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, padding: 6 }}>
             <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,var(--sky),var(--accent))', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 13, color: '#fff' }}>
-              {(profile?.full_name || user?.email || '?').charAt(0).toUpperCase()}
+              {(profile?.full_name || 'J').charAt(0).toUpperCase()}
             </div>
             <div style={{ lineHeight: 1.2, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {profile?.full_name || user?.email}
+                {profile?.full_name || 'Your career'}
               </div>
-              <div onClick={signOut} style={{ fontSize: 11, color: 'var(--faint)', cursor: 'pointer' }}>
-                Sign out
-              </div>
+              <div style={{ fontSize: 11, color: 'var(--faint)' }}>Running locally</div>
             </div>
             <div
               onClick={toggleTheme}

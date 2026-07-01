@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import { computeJobMatches, createApplication, listJobsWithMatches } from '../../data/api';
 import type { JobRegion, JobWithMatch } from '../../types';
 
@@ -13,7 +12,6 @@ const regions: { value: JobRegion | 'all'; label: string }[] = [
 ];
 
 export function JobMatch() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<JobWithMatch[]>([]);
   const [region, setRegion] = useState<JobRegion | 'all'>('all');
@@ -22,9 +20,8 @@ export function JobMatch() {
   const [applyingId, setApplyingId] = useState<string | null>(null);
 
   const load = async () => {
-    if (!user) return;
     setLoading(true);
-    const j = await listJobsWithMatches(user.id, region === 'all' ? undefined : region);
+    const j = await listJobsWithMatches(region === 'all' ? undefined : region);
     setJobs(j);
     setLoading(false);
   };
@@ -32,7 +29,7 @@ export function JobMatch() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, region]);
+  }, [region]);
 
   const handleComputeMatches = async () => {
     setMatching(true);
@@ -45,11 +42,9 @@ export function JobMatch() {
   };
 
   const handleApply = async (job: JobWithMatch) => {
-    if (!user) return;
     setApplyingId(job.id);
     try {
       await createApplication({
-        user_id: user.id,
         job_id: job.id,
         role: job.role,
         company: job.company,

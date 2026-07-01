@@ -1,14 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../context/AuthContext';
 
 export function Landing() {
   const navigate = useNavigate();
   const { dark, toggleTheme } = useTheme();
-  const { user } = useAuth();
 
   const goOnboard = () => navigate('/onboarding');
-  const goApp = () => navigate(user ? '/app' : '/onboarding');
+  const goApp = () => navigate('/app');
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', position: 'relative', overflowX: 'hidden' }}>
