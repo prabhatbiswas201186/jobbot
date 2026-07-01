@@ -26,8 +26,13 @@ From the repo root:
 npm run dev
 ```
 
-This starts both the local server (port 8787) and the web app (port 5173) with
-one command. Open **http://localhost:5173** in your browser.
+This starts both the local server (port 8787) and the web app (port 5290) with
+one command, and automatically opens **http://localhost:5290** in your browser.
+
+JobBot uses its own dedicated port (5290) so it won't clash with other projects
+that use Vite's default 5173. If port 5290 is somehow already in use, JobBot will
+stop with a clear error instead of silently opening on a different port — free it
+up (`npx kill-port 5290`) and run again.
 
 To stop it, press `Ctrl+C` in the terminal.
 
