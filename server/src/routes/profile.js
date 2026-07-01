@@ -1,16 +1,16 @@
 import { Router } from 'express';
-import { db } from '../db.js';
+import { data, save } from '../store.js';
 
 export const profileRouter = Router();
 
 profileRouter.get('/', (_req, res) => {
-  res.json(db.prepare('SELECT * FROM profile WHERE id = 1').get());
+  res.json(data.profile);
 });
 
 profileRouter.patch('/', (req, res) => {
-  const { full_name } = req.body;
-  if (full_name !== undefined) {
-    db.prepare('UPDATE profile SET full_name = ? WHERE id = 1').run(full_name);
+  if (req.body.full_name !== undefined) {
+    data.profile.full_name = req.body.full_name;
+    save();
   }
-  res.json(db.prepare('SELECT * FROM profile WHERE id = 1').get());
+  res.json(data.profile);
 });

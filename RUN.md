@@ -1,9 +1,10 @@
 # Running JobBot locally
 
 This is a fully local app — no cloud accounts, no login. Everything (your résumé,
-applications, interview practice) is stored in a SQLite file on your own laptop
-(`server/jobbot.sqlite3`). The only outside call it makes is to Google's Gemini
-API for the AI features (résumé analysis, job matching, interview coaching).
+applications, interview practice) is stored in a plain JSON file on your own
+laptop (`server/jobbot-data.json`). No database engine, nothing to compile. The
+only outside call it makes is to Google's Gemini API for the AI features (résumé
+analysis, job matching, interview coaching).
 
 ## First-time setup
 
@@ -48,9 +49,9 @@ To stop it, press `Ctrl+C` in the terminal.
   at the time this was built. Nothing refreshes automatically — this is a
   point-in-time snapshot, not a live feed.
 - The Tracker board, applications, and interview schedule are all stored
-  locally and persist across restarts (same SQLite file).
+  locally and persist across restarts (same JSON file).
 
 ## Resetting your data
 
-Delete `server/jobbot.sqlite3` (and any `-wal`/`-shm` files next to it) and
-restart — it'll recreate an empty database with the seed jobs on next launch.
+Delete `server/jobbot-data.json` and restart — it'll recreate an empty store
+with the seed jobs on next launch.

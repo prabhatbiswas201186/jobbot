@@ -1,6 +1,5 @@
 import { Router } from 'express';
-import { randomUUID } from 'node:crypto';
-import { db } from '../db.js';
+import { data, save, randomUUID } from '../store.js';
 import { geminiJSON } from '../gemini.js';
 
 export const resumeRouter = Router();
@@ -64,39 +63,43 @@ ${resumeText.slice(0, 12000)}
 
     const analysis = await geminiJSON(prompt, analyzeSchema);
 
+    // A fresh analysis replaces any previous master résumé.
+    for (const r of data.resumes) r.is_master = false;
+
     const resumeId = randomUUID();
-    db.prepare(
-      `INSERT INTO resumes (id, file_name, raw_text, parsed, ats_score, keyword_have, keyword_missing, recruiter_tip, is_master)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`
-    ).run(
-      resumeId,
-      fileName ?? null,
-      resumeText,
-      JSON.stringify({ roles: analysis.roles, bullets: analysis.bullets, skillGaps: analysis.skillGaps }),
-      analysis.atsScore,
-      JSON.stringify(analysis.keywordHave),
-      JSON.stringify(analysis.keywordMissing),
-      analysis.recruiterTip
-    );
+    data.resumes.push({
+      id: resumeId,
+      file_name: fileName ?? null,
+      raw_text: resumeText,
+      parsed: { roles: analysis.roles, bullets: analysis.bullets, skillGaps: analysis.skillGaps },
+      ats_score: analysis.atsScore,
+      keyword_have: analysis.keywordHave,
+      keyword_missing: analysis.keywordMissing,
+      recruiter_tip: analysis.recruiterTip,
+      is_master: true,
+      created_at: new Date().toISOString(),
+    });
 
-    db.prepare(
-      `INSERT INTO resume_versions (id, resume_id, name, target_role, target_company, ats_score, bullets, keyword_have, keyword_missing, recruiter_tip, status)
-       VALUES (?, ?, 'Master résumé', ?, ?, ?, ?, ?, ?, ?, 'draft')`
-    ).run(
-      randomUUID(),
-      resumeId,
-      targetRole ?? null,
-      targetCompany ?? null,
-      analysis.atsScore,
-      JSON.stringify(analysis.bullets),
-      JSON.stringify(analysis.keywordHave),
-      JSON.stringify(analysis.keywordMissing),
-      analysis.recruiterTip
-    );
+    data.resume_versions.push({
+      id: randomUUID(),
+      resume_id: resumeId,
+      name: 'Master résumé',
+      target_role: targetRole ?? null,
+      target_company: targetCompany ?? null,
+      ats_score: analysis.atsScore,
+      bullets: analysis.bullets,
+      keyword_have: analysis.keywordHave,
+      keyword_missing: analysis.keywordMissing,
+      recruiter_tip: analysis.recruiterTip,
+      status: 'draft',
+      created_at: new Date().toISOString(),
+    });
 
-    db.prepare(
-      `UPDATE profile SET onboarding_stage = 'results', target_comp_min = ?, target_comp_max = ?, target_currency = ? WHERE id = 1`
-    ).run(analysis.targetCompMin, analysis.targetCompMax, analysis.targetCurrency);
+    data.profile.onboarding_stage = 'results';
+    data.profile.target_comp_min = analysis.targetCompMin;
+    data.profile.target_comp_max = analysis.targetCompMax;
+    data.profile.target_currency = analysis.targetCurrency;
+    save();
 
     const careerHealth = { resume: Math.max(0, Math.min(100, analysis.atsScore)), pipeline: 20, interview: 10 };
     res.json({ resumeId, ...analysis, careerHealth });
@@ -132,7 +135,7 @@ resumeRouter.post('/tailor', async (req, res) => {
       return res.status(400).json({ error: 'targetRole and targetCompany are required.' });
     }
 
-    const master = db.prepare('SELECT * FROM resumes WHERE is_master = 1 ORDER BY created_at DESC LIMIT 1').get();
+    const master = [...data.resumes].filter((r) => r.is_master).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
     if (!master) {
       return res.status(400).json({ error: 'Upload a résumé before tailoring a version.' });
     }
@@ -156,25 +159,24 @@ Return:
 
     const tailored = await geminiJSON(prompt, tailorSchema);
 
-    const id = randomUUID();
-    db.prepare(
-      `INSERT INTO resume_versions (id, resume_id, name, target_role, target_company, ats_score, bullets, keyword_have, keyword_missing, recruiter_tip, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'tailoring')`
-    ).run(
-      id,
-      master.id,
-      `${targetCompany} — ${targetRole}`,
-      targetRole,
-      targetCompany,
-      tailored.atsScore,
-      JSON.stringify(tailored.bullets),
-      JSON.stringify(tailored.keywordHave),
-      JSON.stringify(tailored.keywordMissing),
-      tailored.recruiterTip
-    );
+    const version = {
+      id: randomUUID(),
+      resume_id: master.id,
+      name: `${targetCompany} — ${targetRole}`,
+      target_role: targetRole,
+      target_company: targetCompany,
+      ats_score: tailored.atsScore,
+      bullets: tailored.bullets,
+      keyword_have: tailored.keywordHave,
+      keyword_missing: tailored.keywordMissing,
+      recruiter_tip: tailored.recruiterTip,
+      status: 'tailoring',
+      created_at: new Date().toISOString(),
+    };
+    data.resume_versions.push(version);
+    save();
 
-    const version = db.prepare('SELECT * FROM resume_versions WHERE id = ?').get(id);
-    res.json(serializeVersion(version));
+    res.json(version);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -182,26 +184,11 @@ Return:
 });
 
 resumeRouter.get('/master', (_req, res) => {
-  const resume = db.prepare('SELECT * FROM resumes WHERE is_master = 1 ORDER BY created_at DESC LIMIT 1').get();
-  if (!resume) return res.json(null);
-  res.json({
-    ...resume,
-    parsed: JSON.parse(resume.parsed),
-    keyword_have: JSON.parse(resume.keyword_have),
-    keyword_missing: JSON.parse(resume.keyword_missing),
-  });
+  const master = [...data.resumes].filter((r) => r.is_master).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  res.json(master ?? null);
 });
 
 resumeRouter.get('/versions', (_req, res) => {
-  const rows = db.prepare('SELECT * FROM resume_versions ORDER BY created_at DESC').all();
-  res.json(rows.map(serializeVersion));
+  const versions = [...data.resume_versions].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  res.json(versions);
 });
-
-function serializeVersion(row) {
-  return {
-    ...row,
-    bullets: JSON.parse(row.bullets),
-    keyword_have: JSON.parse(row.keyword_have),
-    keyword_missing: JSON.parse(row.keyword_missing),
-  };
-}

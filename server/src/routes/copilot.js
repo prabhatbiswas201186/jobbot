@@ -1,6 +1,5 @@
 import { Router } from 'express';
-import { randomUUID } from 'node:crypto';
-import { db } from '../db.js';
+import { data, save, randomUUID } from '../store.js';
 import { geminiJSON } from '../gemini.js';
 
 export const copilotRouter = Router();
@@ -17,12 +16,13 @@ const chatSchema = {
 };
 
 function buildDataSummary() {
-  const profile = db.prepare('SELECT * FROM profile WHERE id = 1').get();
-  const applications = db.prepare('SELECT * FROM applications ORDER BY updated_at DESC LIMIT 20').all();
-  const interviews = db
-    .prepare(`SELECT * FROM interviews WHERE status = 'scheduled' ORDER BY scheduled_at ASC LIMIT 5`)
-    .all();
-  const resumeVersions = db.prepare('SELECT name, target_company, ats_score, status FROM resume_versions').all();
+  const profile = data.profile;
+  const applications = [...data.applications].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 20);
+  const interviews = data.interviews
+    .filter((i) => i.status === 'scheduled')
+    .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))
+    .slice(0, 5);
+  const resumeVersions = data.resume_versions;
 
   const byStage = {};
   for (const a of applications) byStage[a.stage] = (byStage[a.stage] ?? 0) + 1;
@@ -41,8 +41,8 @@ Applications gone quiet 3+ days in screening: ${staleFollowUps.map((a) => `${a.c
 
 async function chat(message) {
   const dataSummary = buildDataSummary();
-  const history = db.prepare('SELECT role, content FROM copilot_messages ORDER BY created_at DESC LIMIT 10').all();
-  const recentHistory = history.reverse().map((m) => `${m.role}: ${m.content}`).join('\n');
+  const history = [...data.copilot_messages].slice(-10);
+  const recentHistory = history.map((m) => `${m.role}: ${m.content}`).join('\n');
 
   const prompt = message
     ? `You are JobBot, a proactive AI career co-pilot embedded in the user's job search dashboard. Be warm, concise (2-4 sentences), and specific — reference their real pipeline data below when relevant. Never invent facts not implied by the data.
@@ -63,11 +63,18 @@ ${dataSummary}`;
 
   const result = await geminiJSON(prompt, chatSchema);
 
-  const insertMsg = db.prepare(
-    'INSERT INTO copilot_messages (id, role, content, is_insight, cta_label) VALUES (?, ?, ?, ?, ?)'
-  );
-  if (message) insertMsg.run(randomUUID(), 'user', message, 0, null);
-  insertMsg.run(randomUUID(), 'assistant', result.reply, result.insightTitle ? 1 : 0, result.ctaLabel ?? null);
+  if (message) {
+    data.copilot_messages.push({ id: randomUUID(), role: 'user', content: message, is_insight: false, cta_label: null, created_at: new Date().toISOString() });
+  }
+  data.copilot_messages.push({
+    id: randomUUID(),
+    role: 'assistant',
+    content: result.reply,
+    is_insight: Boolean(result.insightTitle),
+    cta_label: result.ctaLabel ?? null,
+    created_at: new Date().toISOString(),
+  });
+  save();
 
   return result;
 }
@@ -91,5 +98,5 @@ copilotRouter.post('/message', async (req, res) => {
 });
 
 copilotRouter.get('/history', (_req, res) => {
-  res.json(db.prepare('SELECT * FROM copilot_messages ORDER BY created_at ASC LIMIT 50').all());
+  res.json(data.copilot_messages.slice(-50));
 });

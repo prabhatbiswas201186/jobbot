@@ -2,7 +2,7 @@
 
 A fully local, single-user career assistant built from the JobBot design
 (`project/JobBot.dc.html`). It runs entirely on your own laptop — no login, no
-cloud database. Your data lives in a local SQLite file; the only external calls
+cloud database. Your data lives in a local JSON file; the only external calls
 are to Google's Gemini API for the AI features.
 
 **→ See [RUN.md](./RUN.md) for setup and how to run it.**
@@ -10,7 +10,7 @@ are to Google's Gemini API for the AI features.
 ## What's inside
 
 - `web/` — React + Vite + TypeScript frontend (the UI from the design)
-- `server/` — local Node/Express API + SQLite storage + Gemini calls
+- `server/` — local Node/Express API + JSON-file storage + Gemini calls
 - `project/` — the original design prototype this was built from
 - `chats/` — the design conversation that produced it
 

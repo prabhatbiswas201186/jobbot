@@ -1,6 +1,5 @@
 import { Router } from 'express';
-import { randomUUID } from 'node:crypto';
-import { db } from '../db.js';
+import { data, save, randomUUID } from '../store.js';
 import { geminiJSON } from '../gemini.js';
 
 export const interviewCoachRouter = Router();
@@ -83,17 +82,28 @@ Return:
 
     const scored = await geminiJSON(prompt, scoreSchema);
 
-    db.prepare(
-      `INSERT INTO mock_sessions (id, interview_id, question, answer_text, structure_score, specificity_score, filler_word_count, readiness_score, feedback)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(randomUUID(), interviewId ?? null, question, answerText, scored.structureScore, scored.specificityScore, scored.fillerWordCount, scored.readinessScore, scored.feedback);
+    data.mock_sessions.push({
+      id: randomUUID(),
+      interview_id: interviewId ?? null,
+      question,
+      answer_text: answerText,
+      structure_score: scored.structureScore,
+      specificity_score: scored.specificityScore,
+      filler_word_count: scored.fillerWordCount,
+      readiness_score: scored.readinessScore,
+      feedback: scored.feedback,
+      created_at: new Date().toISOString(),
+    });
 
     const starMap = Object.fromEntries(scored.star.map((s) => [s.key.toUpperCase(), s.text]));
-    db.prepare(
-      `INSERT INTO star_answers (id, question, situation, task, action, result)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(question) DO UPDATE SET situation = excluded.situation, task = excluded.task, action = excluded.action, result = excluded.result, updated_at = datetime('now')`
-    ).run(randomUUID(), question, starMap.S ?? null, starMap.T ?? null, starMap.A ?? null, starMap.R ?? null);
+    const existing = data.star_answers.find((s) => s.question === question);
+    const fields = { situation: starMap.S ?? null, task: starMap.T ?? null, action: starMap.A ?? null, result: starMap.R ?? null, updated_at: new Date().toISOString() };
+    if (existing) {
+      Object.assign(existing, fields);
+    } else {
+      data.star_answers.push({ id: randomUUID(), question, ...fields });
+    }
+    save();
 
     res.json(scored);
   } catch (err) {
@@ -103,10 +113,10 @@ Return:
 });
 
 interviewCoachRouter.get('/star-answers', (_req, res) => {
-  res.json(db.prepare('SELECT * FROM star_answers').all());
+  res.json(data.star_answers);
 });
 
 interviewCoachRouter.get('/latest-mock', (_req, res) => {
-  const row = db.prepare('SELECT * FROM mock_sessions ORDER BY created_at DESC LIMIT 1').get();
-  res.json(row ?? null);
+  const latest = [...data.mock_sessions].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  res.json(latest ?? null);
 });
