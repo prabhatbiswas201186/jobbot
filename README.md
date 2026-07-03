@@ -1,5 +1,7 @@
 # JobBot — AI Career Operating System
 
+**Live at: https://jobbot-murex.vercel.app**
+
 A live web app for running your job search: résumé intelligence, live job
 matching, interview coaching, an application tracker, and an AI co-pilot —
 all grounded in your real data.
