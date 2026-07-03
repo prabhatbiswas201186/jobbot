@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { listApplications, updateApplicationStage } from '../../data/api';
 import type { Application, ApplicationStage } from '../../types';
 
@@ -16,19 +17,22 @@ function ageLabel(dateStr: string) {
 }
 
 export function Tracker() {
+  const { user } = useAuth();
   const [apps, setApps] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
 
   const load = async () => {
+    if (!user) return;
     setLoading(true);
-    setApps(await listApplications());
+    setApps(await listApplications(user.id));
     setLoading(false);
   };
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const handleDrop = async (stage: ApplicationStage) => {
     if (!dragId) return;

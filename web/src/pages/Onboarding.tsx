@@ -1,15 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { extractResumeText } from '../lib/resumeParser';
-import { analyzeResume, computeJobMatches, getProfile, updateProfile, type AnalyzeResumeResult } from '../data/api';
+import { analyzeResume, computeJobMatches, type AnalyzeResumeResult } from '../data/api';
 
-type Step = 'upload' | 'analyzing' | 'results';
+type Step = 'auth' | 'confirm-email' | 'upload' | 'analyzing' | 'results';
 
 export function Onboarding() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>('upload');
+  const { user, profile, signInWithPassword, signUpWithPassword, signInWithOAuth, refreshProfile } = useAuth();
+  const [step, setStep] = useState<Step>('auth');
 
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signup');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+
   const [pastedText, setPastedText] = useState('');
   const [showPaste, setShowPaste] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -23,18 +31,40 @@ export function Onboarding() {
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    getProfile()
-      .then((p) => {
-        setFullName(p.full_name || '');
-        if (p.onboarding_stage === 'results' || p.onboarding_stage === 'done') navigate('/app');
-      })
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (user) {
+      if (profile?.onboarding_stage === 'results' || profile?.onboarding_stage === 'done') {
+        navigate('/app');
+        return;
+      }
+      setStep('upload');
+    }
+  }, [user, profile, navigate]);
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    setAuthBusy(true);
+    if (authMode === 'signup') {
+      const res = await signUpWithPassword(email, password, fullName);
+      setAuthBusy(false);
+      if (res.error) {
+        setAuthError(res.error);
+        return;
+      }
+      setStep(res.needsEmailConfirmation ? 'confirm-email' : 'upload');
+      return;
+    }
+    const res = await signInWithPassword(email, password);
+    setAuthBusy(false);
+    if (res.error) {
+      setAuthError(res.error);
+      return;
+    }
+    setStep('upload');
+  };
 
   const runAnalysis = async (resumeText: string) => {
     setUploadError(null);
-    if (fullName.trim()) await updateProfile({ full_name: fullName.trim() }).catch(() => {});
     setStep('analyzing');
     setPct(0);
     progressTimer.current = setInterval(() => {
@@ -44,6 +74,7 @@ export function Onboarding() {
     try {
       const analysis = await analyzeResume({ resumeText });
       setResult(analysis);
+      await refreshProfile();
       computeJobMatches()
         .then((r) => setMatchedJobCount(r.matches.length))
         .catch(() => setMatchedJobCount(null));
@@ -83,10 +114,10 @@ export function Onboarding() {
       const ghProfile = await profileRes.json();
       const repos = reposRes.ok ? await reposRes.json() : [];
       const repoLines = (repos as { name: string; description: string | null; language: string | null; stargazers_count: number }[])
+        .filter((r) => !r.name.includes('.github.io') || true)
         .slice(0, 12)
         .map((r) => `- ${r.name}${r.language ? ` (${r.language})` : ''}: ${r.description ?? 'no description'} · ${r.stargazers_count} stars`)
         .join('\n');
-      if (!fullName.trim() && ghProfile.name) setFullName(ghProfile.name);
       const text = `${ghProfile.name ?? ghUsername}
 ${ghProfile.bio ?? ''}
 Location: ${ghProfile.location ?? 'n/a'}
@@ -125,24 +156,138 @@ ${repoLines}`;
           <span style={{ fontFamily: "'Space Grotesk'", fontWeight: 700, fontSize: 17 }}>JobBot</span>
         </div>
 
-        <div style={{ display: 'flex', gap: 7, justifyContent: 'center', marginBottom: 24 }}>
-          <div style={{ width: 34, height: 4, borderRadius: 3, background: 'var(--accent)' }} />
-          <div style={{ width: 34, height: 4, borderRadius: 3, background: dot1 }} />
-          <div style={{ width: 34, height: 4, borderRadius: 3, background: dot2 }} />
-        </div>
+        {step !== 'auth' && step !== 'confirm-email' && (
+          <div style={{ display: 'flex', gap: 7, justifyContent: 'center', marginBottom: 24 }}>
+            <div style={{ width: 34, height: 4, borderRadius: 3, background: 'var(--accent)' }} />
+            <div style={{ width: 34, height: 4, borderRadius: 3, background: dot1 }} />
+            <div style={{ width: 34, height: 4, borderRadius: 3, background: dot2 }} />
+          </div>
+        )}
 
         <div style={{ border: '1px solid var(--border2)', borderRadius: 22, background: 'var(--surface)', boxShadow: 'var(--shadow)', overflow: 'hidden' }}>
+          {step === 'auth' && (
+            <div style={{ padding: 36 }} className="fu">
+              <h2 style={{ fontFamily: "'Space Grotesk'", fontSize: 26, letterSpacing: '-.02em', margin: '0 0 6px' }}>
+                {authMode === 'signup' ? 'Create your account' : 'Welcome back'}
+              </h2>
+              <p style={{ color: 'var(--dim)', margin: '0 0 24px', fontSize: 14.5 }}>
+                {authMode === 'signup' ? "Let's meet your career — takes 40 seconds." : 'Sign in to keep building your pipeline.'}
+              </p>
+
+              <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+                {(['google', 'linkedin_oidc', 'github'] as const).map((provider) => (
+                  <button
+                    key={provider}
+                    onClick={() => signInWithOAuth(provider).then((r) => r.error && setAuthError(r.error))}
+                    style={{
+                      flex: 1,
+                      background: 'var(--surface2)',
+                      border: '1px solid var(--border2)',
+                      color: 'var(--text)',
+                      padding: 12,
+                      borderRadius: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontFamily: 'Manrope',
+                      fontSize: 13,
+                    }}
+                  >
+                    {provider === 'google' ? 'Google' : provider === 'linkedin_oidc' ? 'LinkedIn' : 'GitHub'}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--faint)', fontSize: 12, margin: '4px 0 16px' }}>
+                <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                or with email
+                <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              </div>
+
+              <form onSubmit={handleAuthSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {authMode === 'signup' && (
+                  <input
+                    required
+                    placeholder="Full name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    style={inputStyle}
+                  />
+                )}
+                <input
+                  required
+                  type="email"
+                  placeholder="you@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  style={inputStyle}
+                />
+                <input
+                  required
+                  type="password"
+                  minLength={6}
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  style={inputStyle}
+                />
+                {authError && <div style={{ color: 'var(--rose)', fontSize: 13 }}>{authError}</div>}
+                <button
+                  type="submit"
+                  disabled={authBusy}
+                  style={{
+                    background: 'linear-gradient(135deg,var(--accent),var(--accent2))',
+                    color: '#fff',
+                    border: 'none',
+                    padding: 14,
+                    borderRadius: 12,
+                    fontWeight: 700,
+                    fontSize: 15,
+                    cursor: authBusy ? 'default' : 'pointer',
+                    fontFamily: 'Manrope',
+                    opacity: authBusy ? 0.7 : 1,
+                  }}
+                >
+                  {authBusy ? 'Please wait…' : authMode === 'signup' ? 'Create account' : 'Sign in'}
+                </button>
+              </form>
+              <div style={{ textAlign: 'center', marginTop: 16, fontSize: 13, color: 'var(--faint)' }}>
+                {authMode === 'signup' ? 'Already have an account?' : "Don't have an account?"}{' '}
+                <span
+                  onClick={() => setAuthMode(authMode === 'signup' ? 'signin' : 'signup')}
+                  style={{ color: 'var(--accent2)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  {authMode === 'signup' ? 'Sign in' : 'Create one'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {step === 'confirm-email' && (
+            <div style={{ padding: 36, textAlign: 'center' }} className="fu">
+              <div
+                style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: 15,
+                  background: 'linear-gradient(135deg,var(--accent),var(--accent2))',
+                  display: 'grid',
+                  placeItems: 'center',
+                  margin: '0 auto 18px',
+                  boxShadow: '0 12px 30px -10px var(--glow)',
+                }}
+              >
+                <span style={{ fontSize: 22, color: '#fff' }}>✉</span>
+              </div>
+              <h2 style={{ fontFamily: "'Space Grotesk'", fontSize: 22, letterSpacing: '-.02em', margin: '0 0 8px' }}>Check your inbox</h2>
+              <p style={{ color: 'var(--dim)', margin: 0, fontSize: 14 }}>
+                We sent a confirmation link to <b style={{ color: 'var(--text)' }}>{email}</b>. Click it, then come back here to continue.
+              </p>
+            </div>
+          )}
+
           {step === 'upload' && (
             <div style={{ padding: 36 }} className="fu">
               <h2 style={{ fontFamily: "'Space Grotesk'", fontSize: 26, letterSpacing: '-.02em', margin: '0 0 6px' }}>Let's meet your career</h2>
-              <p style={{ color: 'var(--dim)', margin: '0 0 18px', fontSize: 14.5 }}>Drop your résumé and JobBot builds your entire profile in seconds.</p>
-
-              <input
-                placeholder="Your name (optional, personalizes the dashboard)"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                style={{ ...inputStyle, width: '100%', marginBottom: 16 }}
-              />
+              <p style={{ color: 'var(--dim)', margin: '0 0 24px', fontSize: 14.5 }}>Drop your résumé and JobBot builds your entire profile in seconds.</p>
 
               <div
                 onClick={() => fileInputRef.current?.click()}
@@ -177,12 +322,21 @@ ${repoLines}`;
                   <span style={{ fontSize: 22, color: '#fff' }}>↑</span>
                 </div>
                 <div style={{ fontWeight: 700, fontSize: 16 }}>Drop PDF / DOCX — or click to analyze</div>
-                <div style={{ color: 'var(--faint)', fontSize: 13, marginTop: 6 }}>Everything stays on your laptop</div>
+                <div style={{ color: 'var(--faint)', fontSize: 13, marginTop: 6 }}>We'll never share your data</div>
               </div>
 
-              <div style={{ marginTop: 16 }}>
-                <button onClick={() => setShowPaste((s) => !s)} style={ghostBtnStyle}>
+              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                <button
+                  onClick={() => setShowPaste((s) => !s)}
+                  style={ghostBtnStyle}
+                >
                   Paste text instead
+                </button>
+                <button
+                  onClick={() => signInWithOAuth('linkedin_oidc').then((r) => r.error && setUploadError(r.error))}
+                  style={ghostBtnStyle}
+                >
+                  Import LinkedIn
                 </button>
               </div>
 
@@ -193,9 +347,12 @@ ${repoLines}`;
                     onChange={(e) => setPastedText(e.target.value)}
                     placeholder="Paste your résumé text here…"
                     rows={6}
-                    style={{ ...inputStyle, width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+                    style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
                   />
-                  <button onClick={() => pastedText.trim() && runAnalysis(pastedText)} style={{ ...primaryBtnStyle, marginTop: 10, width: '100%' }}>
+                  <button
+                    onClick={() => pastedText.trim() && runAnalysis(pastedText)}
+                    style={{ ...primaryBtnStyle, marginTop: 10, width: '100%' }}
+                  >
                     Analyze pasted résumé →
                   </button>
                 </div>
@@ -281,7 +438,7 @@ ${repoLines}`;
                 </div>
                 <div>
                   <h2 style={{ fontFamily: "'Space Grotesk'", fontSize: 23, margin: '0 0 4px', letterSpacing: '-.02em' }}>
-                    Meet your baseline{fullName ? `, ${fullName.split(' ')[0]}` : ''}
+                    Meet your baseline, {profile?.full_name?.split(' ')[0] || 'there'}
                   </h2>
                   <p style={{ color: 'var(--dim)', margin: 0, fontSize: 14 }}>
                     {result.atsScore >= 60 ? 'Above average' : 'A solid start'} — and JobBot sees{' '}
@@ -337,7 +494,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 const ghostBtnStyle: React.CSSProperties = {
-  width: '100%',
+  flex: 1,
   background: 'var(--surface2)',
   border: '1px solid var(--border2)',
   color: 'var(--text)',

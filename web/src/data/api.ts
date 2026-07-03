@@ -1,40 +1,28 @@
+import { supabase } from '../lib/supabaseClient';
 import type {
   Application,
-  ApplicationStage,
-  CopilotMessage,
   Interview,
+  Job,
   JobRegion,
   JobWithMatch,
   MockSession,
-  Profile,
   Resume,
   ResumeVersion,
   StarAnswer,
 } from '../types';
 
-const API_BASE = '/api';
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+async function callFunction<T>(name: string, body?: unknown): Promise<T> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  const { data, error } = await supabase.functions.invoke<T>(name, {
+    body: body ?? {},
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error((data && data.error) || `Request to ${path} failed (${res.status})`);
+  if (error) throw error;
+  if (data && typeof data === 'object' && 'error' in (data as Record<string, unknown>)) {
+    throw new Error(String((data as Record<string, unknown>).error));
   }
   return data as T;
-}
-
-// ---------------------------------------------------------------------------
-// Profile
-// ---------------------------------------------------------------------------
-export function getProfile() {
-  return request<Profile>('/profile');
-}
-
-export function updateProfile(input: { full_name?: string }) {
-  return request<Profile>('/profile', { method: 'PATCH', body: JSON.stringify(input) });
 }
 
 // ---------------------------------------------------------------------------
@@ -56,72 +44,117 @@ export interface AnalyzeResumeResult {
 }
 
 export function analyzeResume(input: { resumeText: string; fileName?: string; targetRole?: string; targetCompany?: string }) {
-  return request<AnalyzeResumeResult>('/resume/analyze', { method: 'POST', body: JSON.stringify(input) });
+  return callFunction<AnalyzeResumeResult>('resume-analyze', input);
+}
+
+export async function getMasterResume(userId: string) {
+  const { data, error } = await supabase
+    .from('resumes')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_master', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Resume | null;
 }
 
 export function tailorResume(input: { targetRole: string; targetCompany: string; jobDescription?: string }) {
-  return request<ResumeVersion>('/resume/tailor', { method: 'POST', body: JSON.stringify(input) });
+  return callFunction<ResumeVersion>('resume-tailor', input);
 }
 
-export function getMasterResume() {
-  return request<Resume | null>('/resume/master');
-}
-
-export function listResumeVersions() {
-  return request<ResumeVersion[]>('/resume/versions');
+export async function listResumeVersions(userId: string) {
+  const { data, error } = await supabase
+    .from('resume_versions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as ResumeVersion[];
 }
 
 // ---------------------------------------------------------------------------
 // Jobs
 // ---------------------------------------------------------------------------
-export function listJobsWithMatches(region?: JobRegion) {
-  const qs = region ? `?region=${encodeURIComponent(region)}` : '';
-  return request<JobWithMatch[]>(`/jobs${qs}`);
+export async function listJobsWithMatches(userId: string, region?: JobRegion) {
+  let jobsQuery = supabase.from('jobs').select('*').order('posted_at', { ascending: false });
+  if (region) jobsQuery = jobsQuery.eq('region', region);
+  const { data: jobs, error: jobsErr } = await jobsQuery;
+  if (jobsErr) throw jobsErr;
+
+  const { data: matches, error: matchErr } = await supabase
+    .from('job_matches')
+    .select('job_id, match_score, matched_keywords')
+    .eq('user_id', userId);
+  if (matchErr) throw matchErr;
+
+  const matchByJob = new Map((matches ?? []).map((m) => [m.job_id, m]));
+  return ((jobs ?? []) as Job[])
+    .map((j) => ({
+      ...j,
+      match_score: matchByJob.get(j.id)?.match_score ?? null,
+      matched_keywords: matchByJob.get(j.id)?.matched_keywords ?? [],
+    }))
+    .sort((a, b) => (b.match_score ?? -1) - (a.match_score ?? -1)) as JobWithMatch[];
 }
 
 export function computeJobMatches(region?: JobRegion) {
-  return request<{ matches: { jobId: string; score: number; matchedKeywords: string[] }[] }>('/jobs/match', {
-    method: 'POST',
-    body: JSON.stringify(region ? { region } : {}),
-  });
+  return callFunction<{ matches: unknown[] }>('job-match', region ? { region } : {});
 }
 
 export function searchLiveJobs(input: { query: string; location?: string }) {
-  return request<{ count: number; query: string }>('/jobs/search', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+  return callFunction<{ count: number; query: string }>('jobs-search', input);
 }
 
 // ---------------------------------------------------------------------------
 // Applications / pipeline
 // ---------------------------------------------------------------------------
-export function listApplications() {
-  return request<Application[]>('/applications');
+export async function listApplications(userId: string) {
+  const { data, error } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Application[];
 }
 
-export function createApplication(input: Omit<Application, 'id' | 'applied_at' | 'updated_at'>) {
-  return request<Application>('/applications', { method: 'POST', body: JSON.stringify(input) });
+export async function createApplication(input: Omit<Application, 'id' | 'applied_at' | 'updated_at'> & { user_id: string }) {
+  const { data, error } = await supabase.from('applications').insert(input).select().single();
+  if (error) throw error;
+  return data as Application;
 }
 
-export function updateApplicationStage(id: string, stage: ApplicationStage) {
-  return request<Application>(`/applications/${id}`, { method: 'PATCH', body: JSON.stringify({ stage }) });
+export async function updateApplicationStage(id: string, stage: Application['stage']) {
+  const { error } = await supabase
+    .from('applications')
+    .update({ stage, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------
 // Interviews
 // ---------------------------------------------------------------------------
-export function listUpcomingInterviews() {
-  return request<Interview[]>('/interviews/upcoming');
+export async function listUpcomingInterviews(userId: string) {
+  const { data, error } = await supabase
+    .from('interviews')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'scheduled')
+    .order('scheduled_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Interview[];
 }
 
 // ---------------------------------------------------------------------------
 // Interview coach
 // ---------------------------------------------------------------------------
 export function getQuestionBank(input: { targetRole?: string; targetCompany?: string }) {
-  return request<{ questions: { tag: string; question: string }[] }>('/interview-coach/question-bank', {
-    method: 'POST',
-    body: JSON.stringify(input),
+  return callFunction<{ questions: { tag: string; question: string }[] }>('interview-coach', {
+    mode: 'question_bank',
+    ...input,
   });
 }
 
@@ -135,32 +168,51 @@ export interface ScoreAnswerResult {
 }
 
 export function scoreMockAnswer(input: { question: string; answerText: string; interviewId?: string }) {
-  return request<ScoreAnswerResult>('/interview-coach/score', { method: 'POST', body: JSON.stringify(input) });
+  return callFunction<ScoreAnswerResult>('interview-coach', { mode: 'score_answer', ...input });
 }
 
-export function listStarAnswers() {
-  return request<StarAnswer[]>('/interview-coach/star-answers');
+export async function listStarAnswers(userId: string) {
+  const { data, error } = await supabase.from('star_answers').select('*').eq('user_id', userId);
+  if (error) throw error;
+  return (data ?? []) as StarAnswer[];
 }
 
-export function latestMockSession() {
-  return request<MockSession | null>('/interview-coach/latest-mock');
+export async function latestMockSession(userId: string) {
+  const { data, error } = await supabase
+    .from('mock_sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as MockSession | null;
 }
 
 // ---------------------------------------------------------------------------
 // Co-pilot
 // ---------------------------------------------------------------------------
 export function getCopilotGreeting() {
-  return request<{ reply: string; insightTitle?: string; insightBody?: string; ctaLabel?: string }>('/copilot/greeting');
+  return callFunction<{ reply: string; insightTitle?: string; insightBody?: string; ctaLabel?: string }>(
+    'copilot-chat',
+    {}
+  );
 }
 
 export function sendCopilotMessage(message: string) {
-  return request<{ reply: string; insightTitle?: string; insightBody?: string; ctaLabel?: string }>('/copilot/message', {
-    method: 'POST',
-    body: JSON.stringify({ message }),
-  });
+  return callFunction<{ reply: string; insightTitle?: string; insightBody?: string; ctaLabel?: string }>(
+    'copilot-chat',
+    { message }
+  );
 }
 
-export async function listCopilotHistory() {
-  const rows = await request<(CopilotMessage & { is_insight: number | boolean })[]>('/copilot/history');
-  return rows.map((r) => ({ ...r, is_insight: Boolean(r.is_insight) })) as CopilotMessage[];
+export async function listCopilotHistory(userId: string) {
+  const { data, error } = await supabase
+    .from('copilot_messages')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .limit(50);
+  if (error) throw error;
+  return data ?? [];
 }

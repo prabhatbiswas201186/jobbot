@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { ScoreRing } from '../../components/ScoreRing';
 import { listResumeVersions, tailorResume } from '../../data/api';
 import type { ResumeVersion } from '../../types';
 
 export function ResumeStudio() {
+  const { user } = useAuth();
   const [versions, setVersions] = useState<ResumeVersion[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -14,8 +16,9 @@ export function ResumeStudio() {
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
+    if (!user) return;
     setLoading(true);
-    const v = await listResumeVersions();
+    const v = await listResumeVersions(user.id);
     setVersions(v);
     setSelectedId((prev) => prev ?? v[0]?.id ?? null);
     setLoading(false);
@@ -23,7 +26,8 @@ export function ResumeStudio() {
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const selected = versions.find((v) => v.id === selectedId) ?? versions[0] ?? null;
 
