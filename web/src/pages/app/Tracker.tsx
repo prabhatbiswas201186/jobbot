@@ -69,6 +69,7 @@ export function Tracker() {
                     <div
                       key={c.id}
                       draggable
+                      className="card3d"
                       onDragStart={() => setDragId(c.id)}
                       style={{ padding: 13, borderRadius: 12, background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'grab' }}
                     >

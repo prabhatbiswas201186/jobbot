@@ -202,7 +202,7 @@ export function Landing() {
         </div>
 
         {/* product preview */}
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: 1120, margin: '34px auto 0', padding: '0 26px' }}>
+        <div className="tilt3d" style={{ position: 'relative', zIndex: 1, maxWidth: 1120, margin: '34px auto 0', padding: '0 26px' }}>
           <div
             style={{
               borderRadius: 20,
@@ -426,7 +426,7 @@ export function Landing() {
               ['🎙️', 'Interview Coach', 'Live mock rounds with instant feedback on STAR, filler words, and signal.'],
               ['💸', 'Salary Negotiation', null],
             ].map(([icon, title, desc]) => (
-              <div key={title as string} style={{ padding: 24, borderRadius: 18, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+              <div key={title as string} className="card3d" style={{ padding: 24, borderRadius: 18, border: '1px solid var(--border)', background: 'var(--surface)' }}>
                 <div style={{ fontSize: 22, marginBottom: 12 }}>{icon}</div>
                 <h3 style={{ fontFamily: "'Space Grotesk'", fontSize: 18, margin: '0 0 6px' }}>{title}</h3>
                 <p style={{ color: 'var(--dim)', fontSize: 13.5, lineHeight: 1.5, margin: 0 }}>
@@ -438,7 +438,7 @@ export function Landing() {
                 </p>
               </div>
             ))}
-            <div style={{ padding: 24, borderRadius: 18, border: '1px solid var(--border)', background: 'linear-gradient(160deg,rgba(52,224,161,.14),var(--surface))' }}>
+            <div className="card3d" style={{ padding: 24, borderRadius: 18, border: '1px solid var(--border)', background: 'linear-gradient(160deg,rgba(52,224,161,.14),var(--surface))' }}>
               <div style={{ fontSize: 22, marginBottom: 12 }}>🛰️</div>
               <h3 style={{ fontFamily: "'Space Grotesk'", fontSize: 18, margin: '0 0 6px' }}>Autopilot Agent</h3>
               <p style={{ color: 'var(--dim)', fontSize: 13.5, lineHeight: 1.5, margin: 0 }}>
@@ -457,7 +457,7 @@ export function Landing() {
             <p style={{ color: 'var(--dim)', margin: '12px 0 0' }}>One offer covers a decade of membership.</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
-            <div style={{ padding: 26, borderRadius: 18, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+            <div className="card3d" style={{ padding: 26, borderRadius: 18, border: '1px solid var(--border)', background: 'var(--surface)' }}>
               <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--dim)' }}>Free</div>
               <div style={{ fontFamily: "'Space Grotesk'", fontSize: 38, fontWeight: 700, margin: '8px 0 2px' }}>₹0</div>
               <div style={{ fontSize: 13, color: 'var(--faint)', marginBottom: 18 }}>Get your score</div>
@@ -521,7 +521,7 @@ export function Landing() {
                 Start Pro trial
               </button>
             </div>
-            <div style={{ padding: 26, borderRadius: 18, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+            <div className="card3d" style={{ padding: 26, borderRadius: 18, border: '1px solid var(--border)', background: 'var(--surface)' }}>
               <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--dim)' }}>Teams</div>
               <div style={{ fontFamily: "'Space Grotesk'", fontSize: 38, fontWeight: 700, margin: '8px 0 2px' }}>Custom</div>
               <div style={{ fontSize: 13, color: 'var(--faint)', marginBottom: 18 }}>Coaches &amp; universities</div>

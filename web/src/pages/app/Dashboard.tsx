@@ -127,7 +127,7 @@ export function Dashboard() {
             { label: 'Response rate', value: `${responseRate}%`, delta: totalApps ? 'of applications' : '—', color: 'var(--mint)' },
             { label: 'Offers', value: offers, delta: offers ? 'compare now' : 'keep pushing', color: 'var(--amber)' },
           ].map((s) => (
-            <div key={s.label} style={{ padding: 18, borderRadius: 16, border: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div key={s.label} className="card3d" style={{ padding: 18, borderRadius: 16, border: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 12.5, color: 'var(--dim)' }}>{s.label}</div>
               <div style={{ fontFamily: "'Space Grotesk'", fontWeight: 700, fontSize: 30, margin: '10px 0 2px' }}>{s.value}</div>
               <div style={{ fontSize: 11.5, color: s.color, fontWeight: 600 }}>{s.delta}</div>

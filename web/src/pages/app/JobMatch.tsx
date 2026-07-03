@@ -153,7 +153,7 @@ export function JobMatch() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {jobs.map((j) => (
-            <div key={j.id} style={{ display: 'flex', gap: 16, alignItems: 'center', padding: 18, borderRadius: 16, border: '1px solid var(--border)', background: 'var(--surface)', flexWrap: 'wrap' }}>
+            <div key={j.id} className="card3d" style={{ display: 'flex', gap: 16, alignItems: 'center', padding: 18, borderRadius: 16, border: '1px solid var(--border)', background: 'var(--surface)', flexWrap: 'wrap' }}>
               <div style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--surface2)', border: '1px solid var(--border)', display: 'grid', placeItems: 'center', fontFamily: "'Space Grotesk'", fontWeight: 700, fontSize: 17, flex: 'none' }}>
                 {j.logo_text}
               </div>

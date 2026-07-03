@@ -8,7 +8,7 @@ type Step = 'auth' | 'confirm-email' | 'upload' | 'analyzing' | 'results';
 
 export function Onboarding() {
   const navigate = useNavigate();
-  const { user, profile, signInWithPassword, signUpWithPassword, signInWithOAuth, refreshProfile } = useAuth();
+  const { user, profile, signInWithPassword, signUpWithPassword, refreshProfile } = useAuth();
   const [step, setStep] = useState<Step>('auth');
 
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signup');
@@ -174,34 +174,6 @@ ${repoLines}`;
                 {authMode === 'signup' ? "Let's meet your career — takes 40 seconds." : 'Sign in to keep building your pipeline.'}
               </p>
 
-              <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-                {(['google', 'linkedin_oidc', 'github'] as const).map((provider) => (
-                  <button
-                    key={provider}
-                    onClick={() => signInWithOAuth(provider).then((r) => r.error && setAuthError(r.error))}
-                    style={{
-                      flex: 1,
-                      background: 'var(--surface2)',
-                      border: '1px solid var(--border2)',
-                      color: 'var(--text)',
-                      padding: 12,
-                      borderRadius: 12,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      fontFamily: 'Manrope',
-                      fontSize: 13,
-                    }}
-                  >
-                    {provider === 'google' ? 'Google' : provider === 'linkedin_oidc' ? 'LinkedIn' : 'GitHub'}
-                  </button>
-                ))}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--faint)', fontSize: 12, margin: '4px 0 16px' }}>
-                <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-                or with email
-                <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-              </div>
-
               <form onSubmit={handleAuthSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {authMode === 'signup' && (
                   <input
@@ -331,12 +303,6 @@ ${repoLines}`;
                   style={ghostBtnStyle}
                 >
                   Paste text instead
-                </button>
-                <button
-                  onClick={() => signInWithOAuth('linkedin_oidc').then((r) => r.error && setUploadError(r.error))}
-                  style={ghostBtnStyle}
-                >
-                  Import LinkedIn
                 </button>
               </div>
 
