@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { computeJobMatches, createApplication, listJobsWithMatches, searchLiveJobs } from '../../data/api';
+import { computeJobMatches, createApplication, listJobsWithMatches, searchLiveJobs, tailorResume } from '../../data/api';
 import type { JobRegion, JobWithMatch } from '../../types';
 
 const regions: { value: JobRegion | 'all'; label: string }[] = [
@@ -20,6 +20,7 @@ export function JobMatch() {
   const [loading, setLoading] = useState(true);
   const [matching, setMatching] = useState(false);
   const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [tailoringId, setTailoringId] = useState<string | null>(null);
 
   const [searchRole, setSearchRole] = useState('');
   const [searchLocation, setSearchLocation] = useState('');
@@ -64,6 +65,19 @@ export function JobMatch() {
       await load();
     } finally {
       setMatching(false);
+    }
+  };
+
+  const handleTailorForJob = async (job: JobWithMatch) => {
+    setTailoringId(job.id);
+    setSearchErr(null);
+    try {
+      await tailorResume({ targetRole: job.role, targetCompany: job.company, jobDescription: job.description ?? undefined });
+      navigate('/app/resume');
+    } catch (err) {
+      setSearchErr((err as Error).message);
+    } finally {
+      setTailoringId(null);
     }
   };
 
@@ -184,6 +198,13 @@ export function JobMatch() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flex: 'none' }}>
+                <button
+                  onClick={() => handleTailorForJob(j)}
+                  disabled={tailoringId === j.id}
+                  style={{ background: 'linear-gradient(135deg,var(--accent),var(--accent2))', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Manrope', whiteSpace: 'nowrap', opacity: tailoringId === j.id ? 0.7 : 1 }}
+                >
+                  {tailoringId === j.id ? 'Tailoring…' : '✦ Tailor'}
+                </button>
                 {j.url && (
                   <a
                     href={j.url}

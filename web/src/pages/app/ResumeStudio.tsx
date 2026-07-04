@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { ScoreRing } from '../../components/ScoreRing';
-import { listResumeVersions, tailorResume } from '../../data/api';
-import type { ResumeVersion } from '../../types';
+import { getMasterResume, listResumeVersions, tailorResume } from '../../data/api';
+import type { Resume, ResumeVersion } from '../../types';
 
 export function ResumeStudio() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [versions, setVersions] = useState<ResumeVersion[]>([]);
+  const [master, setMaster] = useState<Resume | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showTailorForm, setShowTailorForm] = useState(false);
@@ -18,8 +19,9 @@ export function ResumeStudio() {
   const load = async () => {
     if (!user) return;
     setLoading(true);
-    const v = await listResumeVersions(user.id);
+    const [v, m] = await Promise.all([listResumeVersions(user.id), getMasterResume(user.id)]);
     setVersions(v);
+    setMaster(m);
     setSelectedId((prev) => prev ?? v[0]?.id ?? null);
     setLoading(false);
   };
@@ -30,6 +32,48 @@ export function ResumeStudio() {
   }, [user]);
 
   const selected = versions.find((v) => v.id === selectedId) ?? versions[0] ?? null;
+
+  const downloadPdf = () => {
+    if (!selected) return;
+    const name = profile?.full_name || 'Your Name';
+    const roles = master?.parsed?.roles ?? [];
+    const skills = selected.keyword_have ?? [];
+    const bullets = selected.bullets ?? [];
+    const title = selected.target_role || roles[0]?.title || '';
+    const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(name)} — Résumé</title>
+<style>
+  @page { margin: 18mm; }
+  body { font-family: Georgia, 'Times New Roman', serif; color: #111; max-width: 720px; margin: 0 auto; padding: 24px; line-height: 1.45; }
+  h1 { font-family: Helvetica, Arial, sans-serif; font-size: 26px; margin: 0 0 2px; letter-spacing: -0.01em; }
+  .sub { color: #444; font-size: 13px; margin-bottom: 18px; }
+  h2 { font-family: Helvetica, Arial, sans-serif; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; border-bottom: 1.5px solid #111; padding-bottom: 4px; margin: 20px 0 10px; }
+  .role { margin-bottom: 10px; }
+  .role b { font-size: 14px; }
+  .role span { color: #555; font-size: 12.5px; }
+  ul { margin: 8px 0 0 18px; padding: 0; }
+  li { font-size: 13px; margin-bottom: 6px; }
+  .skills { font-size: 13px; }
+  .print-hint { text-align:center; font-family: Helvetica, Arial, sans-serif; background:#f3f3f3; padding:10px; border-radius:8px; font-size:12px; color:#555; margin-bottom: 20px; }
+  @media print { .print-hint { display: none; } }
+</style></head><body>
+<div class="print-hint">Press Ctrl+P (or Cmd+P) and choose "Save as PDF" — this box won't be printed.</div>
+<h1>${esc(name)}</h1>
+<div class="sub">${esc(title)}${selected.target_company ? ' · tailored for ' + esc(selected.target_company) : ''}</div>
+${roles.length ? '<h2>Experience</h2>' + roles.map((r) => `<div class="role"><b>${esc(r.title)}</b> — ${esc(r.company)}<br><span>${esc(r.period)}</span></div>`).join('') : ''}
+<h2>Key Achievements</h2>
+<ul>${bullets.map((b) => `<li>${esc(b.rewrite)}</li>`).join('')}</ul>
+${skills.length ? '<h2>Skills</h2><div class="skills">' + skills.map(esc).join(' · ') + '</div>' : ''}
+</body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 400);
+  };
 
   const handleTailor = async () => {
     if (!role.trim() || !company.trim()) return;
@@ -70,6 +114,12 @@ export function ResumeStudio() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 9 }}>
+          <button
+            onClick={downloadPdf}
+            style={{ background: 'var(--surface)', border: '1px solid var(--border2)', color: 'var(--text)', padding: '10px 15px', borderRadius: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'Manrope' }}
+          >
+            ⬇ Download PDF
+          </button>
           <button
             onClick={() => setShowTailorForm((s) => !s)}
             style={{

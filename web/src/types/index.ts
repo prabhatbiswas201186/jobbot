@@ -49,6 +49,7 @@ export interface Job {
   salary_max: number | null;
   currency: string;
   url: string | null;
+  description: string | null;
 }
 
 export interface JobWithMatch extends Job {
