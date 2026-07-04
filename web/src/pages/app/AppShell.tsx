@@ -11,12 +11,21 @@ const navItems = [
   { to: '/app/tracker', icon: '🗂️', label: 'Tracker' },
 ];
 
+const growItems = [
+  { to: '/app/negotiation', icon: '💸', label: 'Negotiation' },
+  { to: '/app/analytics', icon: '📈', label: 'Analytics' },
+  { to: '/app/career', icon: '🧭', label: 'Career Path' },
+];
+
 const titleByPath: Record<string, string> = {
   '/app': 'Mission Control',
   '/app/resume': 'Résumé Studio',
   '/app/jobs': 'Job Match',
   '/app/interview': 'Interview Coach',
   '/app/tracker': 'Tracker',
+  '/app/negotiation': 'Negotiation',
+  '/app/analytics': 'Analytics',
+  '/app/career': 'Career Path',
 };
 
 export function AppShell() {
@@ -77,10 +86,28 @@ export function AppShell() {
         </div>
         <div style={{ padding: '14px 12px 4px', fontSize: 10.5, color: 'var(--faint)', letterSpacing: '.1em', textTransform: 'uppercase' }}>Grow</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '2px 10px' }}>
-          {['💸 Negotiation', '📈 Analytics', '🧭 Career Path'].map((label) => (
-            <div key={label} style={{ padding: '9px 11px', borderRadius: 10, color: 'var(--dim)', fontSize: 14, cursor: 'default', display: 'flex', gap: 10, alignItems: 'center', opacity: 0.6 }}>
-              {label}
-            </div>
+          {growItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              style={({ isActive }) => ({
+                padding: '9px 11px',
+                borderRadius: 10,
+                fontSize: 14,
+                cursor: 'pointer',
+                display: 'flex',
+                gap: 10,
+                alignItems: 'center',
+                transition: '.15s',
+                textDecoration: 'none',
+                fontWeight: isActive ? 600 : 400,
+                color: isActive ? 'var(--text)' : 'var(--dim)',
+                background: isActive ? 'color-mix(in srgb,var(--accent) 16%,transparent)' : 'transparent',
+                border: `1px solid ${isActive ? 'var(--border2)' : 'transparent'}`,
+              })}
+            >
+              {item.icon} <span>{item.label}</span>
+            </NavLink>
           ))}
         </div>
         <div style={{ marginTop: 'auto', padding: 14 }}>

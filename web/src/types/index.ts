@@ -111,3 +111,33 @@ export interface CopilotMessage {
   cta_label: string | null;
   created_at: string;
 }
+
+export interface NegotiationPlan {
+  marketVerdict: string;
+  counterOffer: number;
+  currency: string;
+  script: string[];
+  emailDraft: string;
+  leveragePoints: string[];
+}
+
+export interface CareerPathOption {
+  title: string;
+  summary: string;
+  timeline: string;
+  milestones: { label: string; when: string }[];
+}
+
+export interface SkillRoadmapItem {
+  skill: string;
+  why: string;
+  resource: string;
+  done: boolean;
+}
+
+export interface CareerPathData {
+  id: string;
+  paths: CareerPathOption[];
+  skill_roadmap: SkillRoadmapItem[];
+  created_at: string;
+}

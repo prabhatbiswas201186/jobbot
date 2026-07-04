@@ -1,13 +1,16 @@
 import { supabase } from '../lib/supabaseClient';
 import type {
   Application,
+  CareerPathData,
   Interview,
   Job,
   JobRegion,
   JobWithMatch,
   MockSession,
+  NegotiationPlan,
   Resume,
   ResumeVersion,
+  SkillRoadmapItem,
   StarAnswer,
 } from '../types';
 
@@ -134,6 +137,14 @@ export async function updateApplicationStage(id: string, stage: Application['sta
   if (error) throw error;
 }
 
+export async function updateOfferAmount(id: string, amount: number | null) {
+  const { error } = await supabase
+    .from('applications')
+    .update({ offer_amount: amount, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
 // ---------------------------------------------------------------------------
 // Interviews
 // ---------------------------------------------------------------------------
@@ -146,6 +157,19 @@ export async function listUpcomingInterviews(userId: string) {
     .order('scheduled_at', { ascending: true });
   if (error) throw error;
   return (data ?? []) as Interview[];
+}
+
+export async function createInterview(input: {
+  user_id: string;
+  application_id: string | null;
+  company: string;
+  role: string;
+  kind: string;
+  scheduled_at: string;
+}) {
+  const { data, error } = await supabase.from('interviews').insert(input).select().single();
+  if (error) throw error;
+  return data as Interview;
 }
 
 // ---------------------------------------------------------------------------
@@ -215,4 +239,35 @@ export async function listCopilotHistory(userId: string) {
     .limit(50);
   if (error) throw error;
   return data ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Negotiation
+// ---------------------------------------------------------------------------
+export function getNegotiationPlan(input: { applicationId: string }) {
+  return callFunction<NegotiationPlan>('negotiation', input);
+}
+
+// ---------------------------------------------------------------------------
+// Career path
+// ---------------------------------------------------------------------------
+export function generateCareerPath() {
+  return callFunction<CareerPathData>('career-path', {});
+}
+
+export async function getCareerPath(userId: string) {
+  const { data, error } = await supabase
+    .from('career_paths')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as CareerPathData | null;
+}
+
+export async function saveSkillProgress(id: string, skillRoadmap: SkillRoadmapItem[]) {
+  const { error } = await supabase.from('career_paths').update({ skill_roadmap: skillRoadmap }).eq('id', id);
+  if (error) throw error;
 }

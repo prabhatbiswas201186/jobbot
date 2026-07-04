@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { listApplications, updateApplicationStage } from '../../data/api';
+import { createInterview, listApplications, updateApplicationStage, updateOfferAmount } from '../../data/api';
 import type { Application, ApplicationStage } from '../../types';
 
 const columns: { stage: ApplicationStage; label: string; color: string }[] = [
@@ -9,6 +9,8 @@ const columns: { stage: ApplicationStage; label: string; color: string }[] = [
   { stage: 'interview', label: 'Interview', color: 'var(--accent2)' },
   { stage: 'offer', label: 'Offer', color: 'var(--mint)' },
 ];
+
+const interviewKinds = ['Behavioral', 'Technical', 'Hiring manager', 'HR screen', 'Final round'];
 
 function ageLabel(dateStr: string) {
   const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
@@ -21,6 +23,14 @@ export function Tracker() {
   const [apps, setApps] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
+
+  // Post-drop follow-ups: schedule an interview / record an offer amount.
+  const [scheduleFor, setScheduleFor] = useState<Application | null>(null);
+  const [when, setWhen] = useState('');
+  const [kind, setKind] = useState(interviewKinds[0]);
+  const [offerFor, setOfferFor] = useState<Application | null>(null);
+  const [offerAmount, setOfferAmount] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const load = async () => {
     if (!user) return;
@@ -36,9 +46,50 @@ export function Tracker() {
 
   const handleDrop = async (stage: ApplicationStage) => {
     if (!dragId) return;
+    const app = apps.find((a) => a.id === dragId);
     setApps((prev) => prev.map((a) => (a.id === dragId ? { ...a, stage } : a)));
     await updateApplicationStage(dragId, stage);
     setDragId(null);
+    if (app && stage === 'interview') {
+      setWhen('');
+      setKind(interviewKinds[0]);
+      setScheduleFor({ ...app, stage });
+    }
+    if (app && stage === 'offer') {
+      setOfferAmount(app.offer_amount ? String(app.offer_amount) : '');
+      setOfferFor({ ...app, stage });
+    }
+  };
+
+  const saveInterview = async () => {
+    if (!scheduleFor || !user || !when) return;
+    setSaving(true);
+    try {
+      await createInterview({
+        user_id: user.id,
+        application_id: scheduleFor.id,
+        company: scheduleFor.company,
+        role: scheduleFor.role,
+        kind,
+        scheduled_at: new Date(when).toISOString(),
+      });
+      setScheduleFor(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveOffer = async () => {
+    if (!offerFor) return;
+    const amount = parseInt(offerAmount.replace(/[^\d]/g, ''), 10);
+    setSaving(true);
+    try {
+      await updateOfferAmount(offerFor.id, Number.isFinite(amount) ? amount : null);
+      setApps((prev) => prev.map((a) => (a.id === offerFor.id ? { ...a, offer_amount: amount || null } : a)));
+      setOfferFor(null);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -81,11 +132,15 @@ export function Tracker() {
                       </div>
                       <div style={{ fontSize: 11.5, color: 'var(--dim)', marginBottom: 8 }}>{c.company}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {c.tag && (
+                        {c.stage === 'offer' && c.offer_amount ? (
+                          <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 6, background: 'var(--surface2)', color: 'var(--mint)', border: '1px solid var(--border)', fontWeight: 600 }}>
+                            {c.offer_amount.toLocaleString()}
+                          </span>
+                        ) : c.tag ? (
                           <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 6, background: 'var(--surface2)', color: c.tag_color ?? 'var(--dim)', border: '1px solid var(--border)', fontWeight: 600 }}>
                             {c.tag}
                           </span>
-                        )}
+                        ) : null}
                         <span style={{ fontSize: 11, color: 'var(--faint)', marginLeft: 'auto' }}>{ageLabel(c.updated_at)}</span>
                       </div>
                     </div>
@@ -97,6 +152,127 @@ export function Tracker() {
           })}
         </div>
       )}
+
+      {/* schedule-interview dialog */}
+      {scheduleFor && (
+        <div style={overlayStyle}>
+          <div className="fu" style={dialogStyle}>
+            <h3 style={{ fontFamily: "'Space Grotesk'", fontSize: 19, margin: '0 0 4px' }}>Schedule the interview 🎙️</h3>
+            <p style={{ color: 'var(--dim)', fontSize: 13.5, margin: '0 0 16px' }}>
+              {scheduleFor.company} · {scheduleFor.role} — it'll appear in your Upcoming list and Interview Coach.
+            </p>
+            <label style={labelStyle}>When</label>
+            <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} style={inputStyle} />
+            <label style={labelStyle}>Round type</label>
+            <select value={kind} onChange={(e) => setKind(e.target.value)} style={inputStyle}>
+              {interviewKinds.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+            <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+              <button onClick={() => setScheduleFor(null)} style={ghostBtnStyle}>
+                Skip
+              </button>
+              <button onClick={saveInterview} disabled={saving || !when} style={{ ...primaryBtnStyle, flex: 1, opacity: saving || !when ? 0.6 : 1 }}>
+                {saving ? 'Saving…' : 'Save interview'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* offer-amount dialog */}
+      {offerFor && (
+        <div style={overlayStyle}>
+          <div className="fu" style={dialogStyle}>
+            <h3 style={{ fontFamily: "'Space Grotesk'", fontSize: 19, margin: '0 0 4px' }}>Congrats — an offer! 🎉</h3>
+            <p style={{ color: 'var(--dim)', fontSize: 13.5, margin: '0 0 16px' }}>
+              {offerFor.company} · {offerFor.role} — record the amount to unlock the Negotiation war-room.
+            </p>
+            <label style={labelStyle}>Offer amount (yearly, numbers only)</label>
+            <input
+              inputMode="numeric"
+              placeholder="e.g. 3500000"
+              value={offerAmount}
+              onChange={(e) => setOfferAmount(e.target.value)}
+              style={inputStyle}
+            />
+            <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+              <button onClick={() => setOfferFor(null)} style={ghostBtnStyle}>
+                Skip
+              </button>
+              <button onClick={saveOffer} disabled={saving || !offerAmount.trim()} style={{ ...primaryBtnStyle, flex: 1, opacity: saving || !offerAmount.trim() ? 0.6 : 1 }}>
+                {saving ? 'Saving…' : 'Save offer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+const overlayStyle: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,.55)',
+  backdropFilter: 'blur(4px)',
+  display: 'grid',
+  placeItems: 'center',
+  zIndex: 80,
+};
+
+const dialogStyle: React.CSSProperties = {
+  width: 'min(420px, calc(100vw - 40px))',
+  background: 'var(--surface)',
+  border: '1px solid var(--border2)',
+  borderRadius: 18,
+  padding: 24,
+  boxShadow: 'var(--shadow)',
+};
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: 12,
+  color: 'var(--faint)',
+  textTransform: 'uppercase',
+  letterSpacing: '.06em',
+  margin: '12px 0 6px',
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  background: 'var(--bg2)',
+  border: '1px solid var(--border2)',
+  color: 'var(--text)',
+  padding: '11px 13px',
+  borderRadius: 11,
+  fontSize: 14,
+  outline: 'none',
+};
+
+const ghostBtnStyle: React.CSSProperties = {
+  background: 'var(--surface2)',
+  border: '1px solid var(--border2)',
+  color: 'var(--text)',
+  padding: '11px 16px',
+  borderRadius: 11,
+  fontWeight: 600,
+  cursor: 'pointer',
+  fontFamily: 'Manrope',
+  fontSize: 13,
+};
+
+const primaryBtnStyle: React.CSSProperties = {
+  background: 'linear-gradient(135deg,var(--accent),var(--accent2))',
+  color: '#fff',
+  border: 'none',
+  padding: '11px 16px',
+  borderRadius: 11,
+  fontWeight: 700,
+  cursor: 'pointer',
+  fontFamily: 'Manrope',
+  fontSize: 14,
+};

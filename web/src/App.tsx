@@ -7,6 +7,9 @@ import { ResumeStudio } from './pages/app/ResumeStudio';
 import { JobMatch } from './pages/app/JobMatch';
 import { InterviewCoach } from './pages/app/InterviewCoach';
 import { Tracker } from './pages/app/Tracker';
+import { Negotiation } from './pages/app/Negotiation';
+import { Analytics } from './pages/app/Analytics';
+import { CareerPath } from './pages/app/CareerPath';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
@@ -27,6 +30,9 @@ function App() {
         <Route path="jobs" element={<JobMatch />} />
         <Route path="interview" element={<InterviewCoach />} />
         <Route path="tracker" element={<Tracker />} />
+        <Route path="negotiation" element={<Negotiation />} />
+        <Route path="analytics" element={<Analytics />} />
+        <Route path="career" element={<CareerPath />} />
       </Route>
     </Routes>
   );

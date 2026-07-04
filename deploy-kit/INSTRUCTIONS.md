@@ -43,3 +43,16 @@ For each file in [`deploy-kit/functions/`](./functions):
 
 Claude then hands you the final Vercel click-through (~5 minutes) and the app
 goes live.
+
+---
+
+## Update: Grow modules (Negotiation · Analytics · Career Path)
+
+Two new functions and one extra SQL file power the new modules:
+
+1. **SQL Editor** → New query → paste [`setup-2-career.sql`](./setup-2-career.sql) → Run.
+2. **Edge Functions** → Deploy a new function → Via Editor, for each:
+   - `negotiation` ← paste [`functions/negotiation.ts`](./functions/negotiation.ts)
+   - `career-path` ← paste [`functions/career-path.ts`](./functions/career-path.ts)
+
+(Analytics needs no backend — it computes from your existing data.)
